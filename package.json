@@ -1,5 +1,5 @@
 {
-  "name": "server",
+  "name": "speech-page",
   "version": "1.0.0",
   "description": "",
   "scripts": {
@@ -29,6 +29,6 @@
     "@types/koa-static": "^4.0.2",
     "@types/koa2-ratelimit": "^0.9.3"
   },
-  "author": "",
+  "author": "nossika",
   "license": "MIT"
 }
