@@ -10,7 +10,7 @@
     "axios": "^0.26.1",
     "https-proxy-agent": "^7.0.0",
     "koa": "^2.14.2",
-    "koa-bodyparser": "^4.4.0",
+    "koa-body": "^6.0.1",
     "koa-conditional-get": "^3.0.0",
     "koa-etag": "^4.0.0",
     "koa-static": "^5.0.0",
@@ -25,7 +25,6 @@
   "devDependencies": {
     "@types/koa": "^2.13.5",
     "@types/koa__router": "^12.0.0",
-    "@types/koa-bodyparser": "^4.3.10",
     "@types/koa-static": "^4.0.2",
     "@types/koa2-ratelimit": "^0.9.3"
   },

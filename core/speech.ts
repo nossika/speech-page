@@ -1,30 +1,37 @@
-import { ResultReason, SpeechConfig, SpeechSynthesisOutputFormat, SpeechSynthesizer } from 'microsoft-cognitiveservices-speech-sdk';
+import { AudioConfig, CancellationDetails, CancellationReason, ResultReason, SpeechConfig, SpeechRecognizer, SpeechSynthesisOutputFormat, SpeechSynthesizer } from 'microsoft-cognitiveservices-speech-sdk';
 
 class AzureSpeech {
-  private speechSynthesizer: SpeechSynthesizer;
+  private config: { 
+    key: string; 
+    region: string;
+  };
   constructor({
     key,
     region,
-    voiceName = 'zh-CN-XiaoyiNeural', // @refer: https://learn.microsoft.com/en-us/azure/cognitive-services/speech-service/language-support?tabs=tts#text-to-speech
-    outputFormat = SpeechSynthesisOutputFormat.Audio16Khz128KBitRateMonoMp3,
   }: {
     key: string;
     region: string;
-    voiceName?: string;
-    outputFormat?: SpeechSynthesisOutputFormat;
   }) {
-    const speechConfig = SpeechConfig.fromSubscription(key, region);
-    speechConfig.speechSynthesisVoiceName = voiceName;
-    speechConfig.speechSynthesisOutputFormat = outputFormat;
-
-    const speechSynthesizer = new SpeechSynthesizer(speechConfig);
-    
-    this.speechSynthesizer = speechSynthesizer;
+    this.config = {
+      key,
+      region,
+    };
   }
 
-  async textToSpeechBuffer(text: string) {
+  async textToSpeechBuffer(text: string, {
+    voiceName = 'zh-CN-XiaoyiNeural',
+    outputFormat = SpeechSynthesisOutputFormat.Audio16Khz128KBitRateMonoMp3,
+  }: {
+    voiceName?: string; // @refer: https://learn.microsoft.com/en-us/azure/cognitive-services/speech-service/language-support?tabs=tts#text-to-speech
+    outputFormat?: SpeechSynthesisOutputFormat;
+  } = {}) {
+    const speechConfig = this.getSpeechConfig();
+    speechConfig.speechSynthesisVoiceName = voiceName;
+    speechConfig.speechSynthesisOutputFormat = outputFormat;
+    const speechSynthesizer = new SpeechSynthesizer(speechConfig);
+
     const buffer = await new Promise<ArrayBuffer>((resolve, reject) => {
-      this.speechSynthesizer.speakTextAsync(
+      speechSynthesizer.speakTextAsync(
         text,
         (result) => {
           if (result.reason === ResultReason.SynthesizingAudioCompleted) {
@@ -40,6 +47,42 @@ class AzureSpeech {
     });
     
     return Buffer.from(buffer);
+  }
+
+  async speechToText(wavBuffer: Buffer, {
+    language = 'zh-CN',
+  }: {
+    language?: string;
+  } = {}) {
+    const speechConfig = this.getSpeechConfig();
+    speechConfig.speechRecognitionLanguage = language;
+
+    const audioConfig = AudioConfig.fromWavFileInput(wavBuffer);
+    const speechRecognizer = new SpeechRecognizer(speechConfig, audioConfig);
+
+    return new Promise((resolve, reject) => {
+      speechRecognizer.recognizeOnceAsync(
+        (result) => {
+          switch (result.reason) {
+            case ResultReason.RecognizedSpeech:
+              resolve(result.text);
+              break;
+            default:
+              reject(result.reason);
+          }
+          speechRecognizer.close();
+        },
+        (error) => {
+          reject(error);
+          speechRecognizer.close();
+        },
+      );
+    });
+    
+  }
+
+  private getSpeechConfig() {
+    return SpeechConfig.fromSubscription(this.config.key, this.config.region);
   }
 }
 

@@ -2,7 +2,7 @@
 import path from 'path';
 import Koa from 'koa';
 import serve from 'koa-static';
-import bodyParser from 'koa-bodyparser';
+import koaBody from 'koa-body';
 import etag from 'koa-etag';
 import conditional from 'koa-conditional-get';
 import { Code, response } from '@/util/response';
@@ -42,7 +42,9 @@ app.use(accessLimiter);
 app.use(useAccessLogger());
 
 // parse request body
-app.use(bodyParser());
+app.use(koaBody({
+  multipart: true,
+}));
 
 // router
 app.use(router.routes());
