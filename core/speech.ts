@@ -53,7 +53,7 @@ class AzureSpeech {
     language = 'zh-CN',
   }: {
     language?: string;
-  } = {}) {
+  } = {}): Promise<string> {
     const speechConfig = this.getSpeechConfig();
     speechConfig.speechRecognitionLanguage = language;
 
@@ -67,8 +67,15 @@ class AzureSpeech {
             case ResultReason.RecognizedSpeech:
               resolve(result.text);
               break;
+            case ResultReason.NoMatch:
+              reject('NOMATCH: Speech could not be recognized.');
+              break;
+            case ResultReason.Canceled:
+              const cancellation = CancellationDetails.fromResult(result);
+              reject(`CANCELED: ErrorCode=${cancellation.ErrorCode}, ErrorDetails=${cancellation.errorDetails}`);
+              break;
             default:
-              reject(result.reason);
+              reject(`FAILED: Reason=${result.reason}`);
           }
           speechRecognizer.close();
         },

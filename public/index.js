@@ -48,7 +48,6 @@ const util = {
       const audio = new Audio(url);
       audio.play();
       audio.addEventListener('error', (error) => {
-        console.log(error);
         reject(error);
         URL.revokeObjectURL(url);
       })
@@ -187,6 +186,7 @@ const ToTextApp = {
     const recorderStream = ref(null);
     const text = ref('');
     const error = ref('');
+    const file = ref(null);
 
     const startRecording = async () => {
       const stream = await util.getRecorderStream();
@@ -196,31 +196,87 @@ const ToTextApp = {
     const stopRecording = async () => {
       const stream = recorderStream.value;
       if (!stream) return;
-      const data = await stream();
       recorderStream.value = null;
-      util.playAudio(data);
-      // const resp = await util.request.upload('/speech-to-text', data);
+      error.value = '';
+
+      try {
+        const file = await stream();
+        const resp = await submit(file);
+        text.value = resp.data.text;
+      } catch (err) {
+        console.error(err);
+        error.value = String(err);
+      }
     };
 
     const isRecording = computed(() => !!recorderStream.value);
+
+    const submit = async (file) => {
+      submitting.value = true;
+      const resp = await util.request.upload('/speech-to-text', file)
+        .finally(() => {
+          submitting.value = false;
+        });
+
+      return resp.json();
+    };
+
+    const setFile = (value) => {
+      const f = value?.target.files[0] || null;
+      file.value = f;
+    };
+
+    const upload = async () => {
+      const f = file.value;
+      if (!f) return;
+      file.value = null;
+      error.value = '';
+
+      try {
+        const resp = await submit(f);
+        text.value = resp.data.text;
+      } catch (err) {
+        console.error(err);
+        error.value = String(err);
+      }
+    };
 
     return {
       submitting,
       isRecording,
       startRecording,
       stopRecording,
+      error,
+      text,
+      file,
+      setFile,
+      upload,
     };
   },
   template: `
     <div>
-      TODO
       <div>
-        <v-btn @click="startRecording" :loading="isRecording">
-          start
+        <v-btn @click="startRecording" :loading="isRecording || submitting">
+          record
         </v-btn>
-        <v-btn @click="stopRecording" :disabled="!isRecording">
-          stop
+        <v-btn @click="stopRecording" :disabled="!isRecording" :loading="submitting">
+          submit
         </v-btn>
+      </div>
+      <div>
+        <v-file-input label="Audio File" @input="setFile" @click:clear="setFile(null)">
+          <template v-slot:append>
+            <v-btn @click="upload" :loading="submitting" :disabled="!file">
+              upload
+            </v-btn>
+          </template>
+        </v-file-input>
+      </div>
+      <div>
+        <v-card :text="text" :loading="submitting"/>
+      </div>
+      <div>
+        <v-alert type="error" :text="error" :model-value="!!error"/>
       </div>
     </div>
   `,

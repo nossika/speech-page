@@ -1,8 +1,9 @@
-import fs from 'node:fs';
 import { Middleware } from 'koa';
 import { logger } from '@/util/logger';
 import { Code, response } from '@/util/response';
 import Speech from '@/core/speech';
+import { transferAudioFormat } from '@/core/ffmpeg';
+import { handleCtxError } from '@/util/error';
 
 export const textToSpeechRoute: Middleware = async (ctx) => {
   const text = (ctx.request.body as any)?.text;
@@ -15,22 +16,18 @@ export const textToSpeechRoute: Middleware = async (ctx) => {
 
   logger(`text: ${text}`, ctx);
 
-  let error;
-  const buffer: Buffer | null = await Speech.get()
+  const buffer = await Speech.get()
     .textToSpeechBuffer(text)
-    .catch(err => {
-      error = err;
-      return null;
+    .catch(error => {
+      handleCtxError({
+        ctx,
+        error,
+        name: 'textToSpeechBuffer failed',
+        extraLog: `text: ${text}`,
+      });
     });
 
-  if (error) {
-    const errStr = `Speech sdk error: ${error.toString()}`;
-    logger(`error: ${errStr}, params: ${text}`, ctx, 'error');
-
-    ctx.status = 500;
-    ctx.body = response(errStr, Code.serverError);
-    return;
-  }
+  if (!buffer) return;
 
   ctx.set('Content-Type', 'audio/mpeg');
   ctx.body = buffer;
@@ -45,26 +42,30 @@ export const speechToTextRoute: Middleware = async (ctx) => {
     return;
   }
 
-  const buffer = await fs.readFileSync(file.filepath);
-
-  // @todo: buffer -> wav
-
-  let error;
-  const text = await Speech.get()
-    .speechToText(buffer)
-    .catch(err => {
-      error = err;
-      return null;
+  const buffer = await transferAudioFormat(file.filepath)
+    .catch(error => {
+      handleCtxError({
+        ctx,
+        error,
+        name: `transferAudioFormat failed`,
+        extraLog: `file: ${file.filepath}`,
+      });
     });
 
-  if (error) {
-    const errStr = `Speech sdk error: ${error.toString()}`;
-    logger(`error: ${errStr}, params: ${text}`, ctx, 'error');
+  if (!buffer) return;
 
-    ctx.status = 500;
-    ctx.body = response(errStr, Code.serverError);
-    return;
-  }
+  const text = await Speech.get()
+    .speechToText(buffer)
+    .catch(error => {
+      handleCtxError({
+        ctx,
+        error,
+        name: 'speechToText failed',
+        extraLog: `file: ${file.filepath}`,
+      });
+    });
+
+  if (!text) return;
 
   ctx.body = response({
     text,
