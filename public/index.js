@@ -104,6 +104,7 @@ const ToSpeechApp = {
     const text = ref('');
     const submitType = ref('play');
     const error = ref('');
+    const playing = ref(false);
 
     const submit = async () => {
       if (loading.value || !text.value) return;
@@ -119,10 +120,15 @@ const ToSpeechApp = {
 
         switch (submitType.value) {
           case 'play':
-            util.playAudio(audio);
+            playing.value = true;
+            util.playAudio(audio).finally(() => {
+              playing.value = false;
+              text.value = '';
+            });
             break;
           case 'save':
             util.download(audio, `${text.value.slice(0, 10)}.mp3`);
+            text.value = '';
             break;
         }
       } catch (err) {
@@ -130,7 +136,6 @@ const ToSpeechApp = {
         error.value = String(err);
       }
 
-      text.value = '';
       loading.value = false;
     };
 
@@ -149,13 +154,15 @@ const ToSpeechApp = {
       submitType,
       setSubmitType,
       loading,
+      playing,
       error,
     };
   },
   template: `
     <div>
       <div>
-        <v-textarea label="text to speech" variant="outlined" :value="text" @input="setText" @keyup.ctrl.enter="submit" placeholder="Use Ctrl + Enter to submit">
+        <v-textarea label="Some Text" variant="outlined" :value="text" @input="setText" :loading="loading"
+          @keyup.ctrl.enter="submit" placeholder="Use Ctrl + Enter to submit" :prepend-inner-icon="playing ? 'mdi-account-voice' : 'mdi-comment'">
           <template v-slot:append>
             <div>
               <div>
@@ -165,7 +172,7 @@ const ToSpeechApp = {
                 </v-radio-group>
               </div>
               <div style="display: flex; justify-content: center">
-                <v-btn @click="submit" :loading="loading" :disabled="!text">
+                <v-btn @click="submit" :loading="loading" :disabled="!text || playing">
                   SPEECH
                 </v-btn>
               </div>
@@ -227,6 +234,7 @@ const ToTextApp = {
     };
 
     const upload = async () => {
+      if (submitting.value) return;
       const f = file.value;
       if (!f) return;
       file.value = null;
@@ -256,27 +264,32 @@ const ToTextApp = {
   template: `
     <div>
       <div>
-        <v-btn @click="startRecording" :loading="isRecording || submitting">
-          record
-        </v-btn>
-        <v-btn @click="stopRecording" :disabled="!isRecording" :loading="submitting">
-          submit
-        </v-btn>
+        <div>
+          Record Voice:
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <v-btn @click="startRecording" :loading="isRecording || submitting" prepend-icon="mdi-microphone">
+            record
+          </v-btn>
+          <v-btn @click="stopRecording" :disabled="!isRecording" :loading="submitting" prepend-icon="mdi-upload">
+            upload
+          </v-btn>
+        </div>
       </div>
       <div>
-        <v-file-input label="Audio File" @input="setFile" @click:clear="setFile(null)">
-          <template v-slot:append>
-            <v-btn @click="upload" :loading="submitting" :disabled="!file">
-              upload
-            </v-btn>
-          </template>
-        </v-file-input>
-      </div>
-      <div>
-        <v-card :text="text" :loading="submitting"/>
+        <div>
+          Upload Voice File:
+        </div>
+        <div>
+          <v-file-input label="Audio File" @input="setFile" @click:clear="setFile(null)" :loading="submitting"
+            accept="audio/*" variant="outlined" show-size append-icon="mdi-upload" @click:append="upload"/>
+        </div>
       </div>
       <div>
         <v-alert type="error" :text="error" :model-value="!!error"/>
+      </div>
+      <div>
+        <v-card :text="text" :loading="submitting"/>
       </div>
     </div>
   `,
