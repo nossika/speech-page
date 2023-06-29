@@ -3,14 +3,30 @@ import { logger } from '@/util/logger';
 import { Code, response } from '@/util/response';
 import Speech from '@/core/speech';
 import { transferAudioFormat } from '@/core/ffmpeg';
-import { handleCtxError } from '@/util/error';
+import { handleCtxErr } from '@/util/error';
+import config from '@/config';
 
 export const textToSpeechRoute: Middleware = async (ctx) => {
   const text = (ctx.request.body as any)?.text;
 
   if (!text) {
-    ctx.status = 403;
-    ctx.body = response('invalid params', Code.clientError);
+    handleCtxErr({
+      ctx,
+      err: new Error('invalid params'),
+      name: 'params check',
+      code: Code.Forbidden,
+    });
+    return;
+  }
+
+  if (text.length > config.speechTextLengthLimit) {
+    handleCtxErr({
+      ctx,
+      err: new Error(`text length exceeds, limit: ${config.speechTextLengthLimit}, received: ${text.length}`),
+      name: 'params check',
+      extraLog: `text: ${text}`,
+      code: Code.Forbidden,
+    });
     return;
   }
 
@@ -18,11 +34,11 @@ export const textToSpeechRoute: Middleware = async (ctx) => {
 
   const buffer = await Speech.get()
     .textToSpeechBuffer(text)
-    .catch(error => {
-      handleCtxError({
+    .catch(err => {
+      handleCtxErr({
         ctx,
-        error,
-        name: 'textToSpeechBuffer failed',
+        err,
+        name: 'to speech buffer failed',
         extraLog: `text: ${text}`,
       });
     });
@@ -34,20 +50,24 @@ export const textToSpeechRoute: Middleware = async (ctx) => {
 };
 
 export const speechToTextRoute: Middleware = async (ctx) => {
-  const file = ctx.request.files.file as any;
+  const file = ctx.request.files?.file as any;
 
   if (!file) {
-    ctx.status = 403;
-    ctx.body = response('invalid params', Code.clientError);
+    handleCtxErr({
+      ctx,
+      err: new Error('invalid params'),
+      name: 'params check',
+      code: Code.Forbidden,
+    });
     return;
   }
 
   const buffer = await transferAudioFormat(file.filepath)
-    .catch(error => {
-      handleCtxError({
+    .catch(err => {
+      handleCtxErr({
         ctx,
-        error,
-        name: `transferAudioFormat failed`,
+        err,
+        name: `transfer audio failed`,
         extraLog: `file: ${file.filepath}`,
       });
     });
@@ -56,11 +76,11 @@ export const speechToTextRoute: Middleware = async (ctx) => {
 
   const text = await Speech.get()
     .speechToText(buffer)
-    .catch(error => {
-      handleCtxError({
+    .catch(err => {
+      handleCtxErr({
         ctx,
-        error,
-        name: 'speechToText failed',
+        err,
+        name: 'to text failed',
         extraLog: `file: ${file.filepath}`,
       });
     });

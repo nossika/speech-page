@@ -8,6 +8,7 @@ import conditional from 'koa-conditional-get';
 import { Code, response } from '@/util/response';
 import { useAccessLogger } from '@/util/logger';
 import { accessLimiter } from '@/util/limiter';
+import { handleCtxErr } from '@/util/error';
 import router from '@/router';
 import config from '@/config';
 import Speech from '@/core/speech';
@@ -41,9 +42,23 @@ app.use(accessLimiter);
 // logger
 app.use(useAccessLogger());
 
+app.use(async (ctx, next) => {
+  try {
+    await next();
+  } catch (err) {
+    handleCtxErr({
+      ctx,
+      err,
+    });
+  }
+});
+
 // parse request body
 app.use(koaBody({
   multipart: true,
+  formidable: {
+    maxFileSize: config.fileSizeLimit,
+  },
 }));
 
 // router
@@ -51,8 +66,11 @@ app.use(router.routes());
 
 // fallback to 404
 app.use(async (ctx) => {
-  ctx.status = 404;
-  ctx.body = response('404', Code.clientError);
+  handleCtxErr({
+    ctx,
+    err: new Error('404'),
+    code: Code.NotFound,
+  });
 });
 
 // start server
