@@ -123,12 +123,10 @@ const ToSpeechApp = {
             playing.value = true;
             util.playAudio(audio).finally(() => {
               playing.value = false;
-              text.value = '';
             });
             break;
           case 'save':
             util.download(audio, `${text.value.slice(0, 10)}.mp3`);
-            text.value = '';
             break;
         }
       } catch (err) {
@@ -159,9 +157,9 @@ const ToSpeechApp = {
     };
   },
   template: `
-    <div>
+    <v-card class="pa-4">
       <div>
-        <v-textarea label="Some Text" variant="outlined" :value="text" @input="setText" :loading="loading"
+        <v-textarea label="Some Text" variant="outlined" :value="text" @input="setText" :loading="loading" hide-details="auto"
           @keyup.ctrl.enter="submit" placeholder="Use Ctrl + Enter to submit" :prepend-inner-icon="playing ? 'mdi-account-voice' : 'mdi-comment'">
           <template v-slot:append>
             <div>
@@ -171,19 +169,18 @@ const ToSpeechApp = {
                   <v-radio label="Save" value="save"></v-radio>
                 </v-radio-group>
               </div>
-              <div style="display: flex; justify-content: center">
-                <v-btn @click="submit" :loading="loading" :disabled="!text || playing">
+              <div class="d-flex justify-center">
+                <v-btn @click="submit" :loading="loading" :disabled="!text || playing"
+                  color="teal-darken-1" prepend-icon="mdi-account-voice">
                   SPEECH
                 </v-btn>
               </div>
             </div>
           </template>
         </v-textarea>
+        <v-alert class="mt-4" type="error" :text="error" :model-value="!!error"/>
       </div>
-      <div>
-        <v-alert type="error" :text="error" :model-value="!!error"/>
-      </div>
-    </div>
+    </v-card>
   `,
 };
 
@@ -193,11 +190,19 @@ const ToTextApp = {
     const recorderStream = ref(null);
     const text = ref('');
     const error = ref('');
-    const file = ref(null);
+    const files = ref([]);
+
+    const file = computed(() => {
+      return files?.value?.[0] || null;
+    });
 
     const startRecording = async () => {
-      const stream = await util.getRecorderStream();
-      recorderStream.value = stream;
+      if (recorderStream.value) return;
+      error.value = '';
+      const stream = await util.getRecorderStream().catch(err => {
+        error.value = String(err);
+      });
+      recorderStream.value = stream || null;
     };
 
     const stopRecording = async () => {
@@ -207,9 +212,11 @@ const ToTextApp = {
       error.value = '';
 
       try {
-        const file = await stream();
-        const resp = await submit(file);
-        text.value = resp.data.text;
+        const blob = await stream();
+        const f = new File([blob], new Date().toLocaleString(), {
+          type: blob.type,
+        });
+        files.value = [f];
       } catch (err) {
         console.error(err);
         error.value = String(err);
@@ -218,38 +225,29 @@ const ToTextApp = {
 
     const isRecording = computed(() => !!recorderStream.value);
 
-    const submit = async (file) => {
-      submitting.value = true;
-      const resp = await util.request.upload('/speech-to-text', file)
-        .finally(() => {
-          submitting.value = false;
-        });
-
-      return resp.json();
-    };
-
-    const setFile = (value) => {
-      const f = value?.target.files[0] || null;
-      file.value = f;
-    };
-
-    const upload = async () => {
-      if (submitting.value) return;
+    const download = () => {
       const f = file.value;
       if (!f) return;
-      file.value = null;
-      error.value = '';
+      util.download(f, f.name);
+    };
 
+    const submit = async () => {
+      if (submitting.value || !file.value) return;
+      error.value = '';
+      submitting.value = true;
       try {
-        const resp = await submit(f);
-        text.value = resp.data.text;
+        const resp = await util.request.upload('/speech-to-text', file.value);
+        const d = await resp.json();
+        text.value = d.data.text;
       } catch (err) {
         console.error(err);
         error.value = String(err);
       }
+      submitting.value = false;
     };
 
     return {
+      submit,
       submitting,
       isRecording,
       startRecording,
@@ -257,41 +255,47 @@ const ToTextApp = {
       error,
       text,
       file,
-      setFile,
-      upload,
+      files,
+      download,
     };
   },
   template: `
-    <div>
+    <v-card class="pa-4">
       <div>
-        <div>
-          Record Voice:
-        </div>
-        <div style="display: flex; gap: 10px;">
-          <v-btn @click="startRecording" :loading="isRecording || submitting" prepend-icon="mdi-microphone">
+        <v-chip label>
+          <v-icon start icon="mdi-microphone"></v-icon>
+          Record Voice
+        </v-chip>
+        <div class="d-flex mt-2" style="gap: 8px;">
+          <v-btn @click="startRecording" :loading="isRecording" :disabled="submitting" prepend-icon="mdi-microphone">
             record
           </v-btn>
-          <v-btn @click="stopRecording" :disabled="!isRecording" :loading="submitting" prepend-icon="mdi-upload">
-            upload
+          <v-btn @click="stopRecording" :disabled="!isRecording" prepend-icon="mdi-stop">
+            stop
           </v-btn>
         </div>
-      </div>
-      <div>
-        <div>
-          Upload Voice File:
+        <div class="mt-2">
+          OR
         </div>
-        <div>
-          <v-file-input label="Audio File" @input="setFile" @click:clear="setFile(null)" :loading="submitting"
-            accept="audio/*" variant="outlined" show-size append-icon="mdi-upload" @click:append="upload"/>
+        <v-chip label class="mt-2">
+          <v-icon start icon="mdi-upload"></v-icon>
+          Upload Voice File
+        </v-chip>
+        <div class="mt-2">
+          <v-file-input label="Audio File" v-model="files" :loading="submitting"
+            accept="audio/*" variant="outlined" show-size hide-details="auto"
+            append-icon="mdi-download" @click:append="download" density="compact"/>
         </div>
       </div>
-      <div>
-        <v-alert type="error" :text="error" :model-value="!!error"/>
+      <div class="mt-4">
+        <v-btn @click="submit" :loading="submitting" :disabled="isRecording || !file"
+          color="teal-darken-1" prepend-icon="mdi-upload">
+          submit
+        </v-btn>
       </div>
-      <div>
-        <v-card :text="text" :loading="submitting"/>
-      </div>
-    </div>
+      <v-alert class="mt-4" type="error" :text="error" :model-value="!!error"/>
+      <v-alert class="mt-4" :text="text" :model-value="!!text"/>
+    </v-card>
   `,
 };
 
@@ -318,7 +322,7 @@ const App = {
   },
   template: `
     <v-container>
-      <div style="margin-bottom: 20px; display: flex; justify-content: center;">
+      <div class="d-flex justify-center mb-4">
         <v-btn-toggle
           v-model="tab"
           color="cyan-lighten-4"
