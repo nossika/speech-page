@@ -7,6 +7,7 @@ const util = {
         method: 'post',
         headers: {
           'Content-Type': 'application/json',
+          'X-Key': util.getURLParams('key'),
         },
         body: JSON.stringify(data),
       });
@@ -22,6 +23,9 @@ const util = {
       formData.append('file', file);
       const response = await window.fetch(url, {
         method: 'post',
+        headers: {
+          'X-Key': util.getURLParams('key'),
+        },
         body: formData,
       });
 
@@ -41,6 +45,15 @@ const util = {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  },
+  getURLParams(key) {
+    const params = new URLSearchParams(location.search);
+    return params.get(key) || '';
+  },
+  setURLParams(key, val) {
+    const params = new URLSearchParams(location.search);
+    params.set(key, val);
+    history.pushState(null, '', `?${params.toString()}`);
   },
   async playAudio(blob) {
     return new Promise((resolve, reject) => {
@@ -307,12 +320,10 @@ const App = {
       toText: 'to-text',
     };
 
-    const params = new URLSearchParams(location.search);
-    const tab = ref(params.get('tab') || TAB.toSpeech);
+    const tab = ref(util.getURLParams('tab') || TAB.toSpeech);
 
     watchEffect(() => {
-      params.set('tab', tab.value);
-      history.pushState(null, '', `?${params.toString()}`);
+      util.setURLParams('tab', tab.value);
     });
 
     return {
