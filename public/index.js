@@ -176,7 +176,7 @@ const ToSpeechApp = {
           label="Original Text" variant="outlined" :value="text" @input="setText" :loading="loading" hide-details="auto"
           @keyup.ctrl.enter="submit" placeholder="Use Ctrl + Enter to submit" :prepend-inner-icon="playing ? 'mdi-account-voice' : 'mdi-comment'"
         />
-        <div class="d-flex align-center mt-4" style="gap: 16px;">
+        <div class="d-flex align-center mt-4 flex-wrap" style="gap: 16px;">
           <v-btn
             @click="submit" :loading="loading" :disabled="!text || playing"
             color="teal-darken-1" prepend-icon="mdi-account-voice"
@@ -290,7 +290,7 @@ const ToTextApp = {
             <v-icon start icon="mdi-microphone"></v-icon>
             Record Real-time Voice
           </div>
-          <div class="d-flex mt-4" style="gap: 16px;">
+          <div class="d-flex mt-4 flex-wrap" style="gap: 16px;">
             <v-btn @click="startRecording" :loading="isRecording" :disabled="submitting" prepend-icon="mdi-record-circle">
               record
             </v-btn>
@@ -299,7 +299,7 @@ const ToTextApp = {
             </v-btn>
           </div>
         </div>
-        <v-divider vertical></v-divider>
+        <v-divider vertical />
         <div class="w-50 pl-4 pb-4">
           <div>
             <v-icon start icon="mdi-upload"></v-icon>
@@ -315,7 +315,7 @@ const ToTextApp = {
         </div>        
       </div>
       <v-divider />
-      <div class="d-flex mt-4" style="gap: 16px;">
+      <div class="d-flex mt-4 flex-wrap" style="gap: 16px;">
         <v-btn @click="submit" :loading="submitting" :disabled="isRecording || !file"
           color="teal-darken-1" prepend-icon="mdi-text-recognition">
           textualize
