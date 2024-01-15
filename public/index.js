@@ -138,7 +138,7 @@ const ToSpeechApp = {
               playing.value = false;
             });
             break;
-          case 'save':
+          case 'download':
             util.download(audio, `${text.value.slice(0, 10)}.mp3`);
             break;
         }
@@ -172,25 +172,22 @@ const ToSpeechApp = {
   template: `
     <v-card class="pa-4">
       <div>
-        <v-textarea label="Some Text" variant="outlined" :value="text" @input="setText" :loading="loading" hide-details="auto"
-          @keyup.ctrl.enter="submit" placeholder="Use Ctrl + Enter to submit" :prepend-inner-icon="playing ? 'mdi-account-voice' : 'mdi-comment'">
-          <template v-slot:append>
-            <div>
-              <div>
-                <v-radio-group inline density="compact" :model-value="submitType" @update:modelValue="setSubmitType">
-                  <v-radio label="Play" value="play"></v-radio>
-                  <v-radio label="Save" value="save"></v-radio>
-                </v-radio-group>
-              </div>
-              <div class="d-flex justify-center">
-                <v-btn @click="submit" :loading="loading" :disabled="!text || playing"
-                  color="teal-darken-1" prepend-icon="mdi-account-voice">
-                  SPEECH
-                </v-btn>
-              </div>
-            </div>
-          </template>
-        </v-textarea>
+        <v-textarea
+          label="Original Text" variant="outlined" :value="text" @input="setText" :loading="loading" hide-details="auto"
+          @keyup.ctrl.enter="submit" placeholder="Use Ctrl + Enter to submit" :prepend-inner-icon="playing ? 'mdi-account-voice' : 'mdi-comment'"
+        />
+        <div class="d-flex align-center mt-4" style="gap: 16px;">
+          <v-btn
+            @click="submit" :loading="loading" :disabled="!text || playing"
+            color="teal-darken-1" prepend-icon="mdi-account-voice"
+          >
+            speak
+          </v-btn>
+          <v-radio-group inline :model-value="submitType" @update:modelValue="setSubmitType" hide-details>
+            <v-radio label="Play" value="play"></v-radio>
+            <v-radio label="Download" value="download"></v-radio>
+          </v-radio-group>
+        </div>
         <v-alert class="mt-4" type="error" :text="error" :model-value="!!error"/>
       </div>
     </v-card>
@@ -200,6 +197,7 @@ const ToSpeechApp = {
 const ToTextApp = {
   setup() {
     const submitting = ref(false);
+    const playing = ref(false);
     const recorderStream = ref(null);
     const text = ref('');
     const error = ref('');
@@ -226,9 +224,13 @@ const ToTextApp = {
 
       try {
         const blob = await stream();
-        const f = new File([blob], new Date().toLocaleString(), {
-          type: blob.type,
-        });
+        const f = new File(
+          [blob],
+          `voice_${new Date().toLocaleString()}`,
+          {
+            type: blob.type,
+          }
+        );
         files.value = [f];
       } catch (err) {
         console.error(err);
@@ -259,9 +261,17 @@ const ToTextApp = {
       submitting.value = false;
     };
 
+    const play = async () => {
+      if (!file.value) return;
+      playing.value = true;
+      util.playAudio(file.value).finally(() => playing.value = false);
+    };
+
     return {
       submit,
+      play,
       submitting,
+      playing,
       isRecording,
       startRecording,
       stopRecording,
@@ -274,36 +284,45 @@ const ToTextApp = {
   },
   template: `
     <v-card class="pa-4">
-      <div>
-        <v-chip label>
-          <v-icon start icon="mdi-microphone"></v-icon>
-          Record Voice
-        </v-chip>
-        <div class="d-flex mt-2" style="gap: 8px;">
-          <v-btn @click="startRecording" :loading="isRecording" :disabled="submitting" prepend-icon="mdi-microphone">
-            record
-          </v-btn>
-          <v-btn @click="stopRecording" :disabled="!isRecording" prepend-icon="mdi-stop">
-            stop
-          </v-btn>
+      <div class="d-flex justify-space-between">
+        <div class="w-50 pr-4 pb-4">
+          <div>
+            <v-icon start icon="mdi-microphone"></v-icon>
+            Record Real-time Voice
+          </div>
+          <div class="d-flex mt-4" style="gap: 16px;">
+            <v-btn @click="startRecording" :loading="isRecording" :disabled="submitting" prepend-icon="mdi-record-circle">
+              record
+            </v-btn>
+            <v-btn @click="stopRecording" :disabled="!isRecording" prepend-icon="mdi-stop">
+              stop
+            </v-btn>
+          </div>
         </div>
-        <div class="mt-2">
-          OR
-        </div>
-        <v-chip label class="mt-2">
-          <v-icon start icon="mdi-upload"></v-icon>
-          Upload Voice File
-        </v-chip>
-        <div class="mt-2">
-          <v-file-input label="Audio File" v-model="files" :loading="submitting"
-            accept="audio/*" variant="outlined" show-size hide-details="auto"
-            append-icon="mdi-download" @click:append="download" density="compact"/>
-        </div>
+        <v-divider vertical></v-divider>
+        <div class="w-50 pl-4 pb-4">
+          <div>
+            <v-icon start icon="mdi-upload"></v-icon>
+            Upload Voice File
+          </div>
+          <div class="mt-4">
+            <v-file-input
+              label="Audio File" v-model="files" :loading="submitting"
+              accept="audio/*" variant="outlined" show-size hide-details="auto"
+              append-icon="mdi-download" @click:append="download" density="compact"
+            />
+          </div>
+        </div>        
       </div>
-      <div class="mt-4">
+      <v-divider />
+      <div class="d-flex mt-4" style="gap: 16px;">
         <v-btn @click="submit" :loading="submitting" :disabled="isRecording || !file"
-          color="teal-darken-1" prepend-icon="mdi-upload">
-          submit
+          color="teal-darken-1" prepend-icon="mdi-text-recognition">
+          textualize
+        </v-btn>
+        <v-btn @click="play" :loading="playing" :disabled="isRecording || !file"
+          prepend-icon="mdi-play">
+          play
         </v-btn>
       </div>
       <v-alert class="mt-4" type="error" :text="error" :model-value="!!error"/>
@@ -316,11 +335,11 @@ const App = {
   setup() {
     const { ref, watchEffect } = Vue;
     const TAB = {
-      toSpeech: 'to-speech',
-      toText: 'to-text',
+      speak: 'speak',
+      textualize: 'textualize',
     };
 
-    const tab = ref(util.getURLParams('tab') || TAB.toSpeech);
+    const tab = ref(util.getURLParams('tab') || TAB.speak);
 
     watchEffect(() => {
       util.setURLParams('tab', tab.value);
@@ -339,17 +358,17 @@ const App = {
           color="cyan-lighten-4"
           density="compact"
         >
-          <v-btn :value="TAB.toSpeech">
-            to speech
+          <v-btn :value="TAB.speak">
+            speak
           </v-btn>
-          <v-btn :value="TAB.toText">
-            to text
+          <v-btn :value="TAB.textualize">
+            textualize
           </v-btn>
         </v-btn-toggle>
       </div>
       <div>
-        <to-speech-app v-show="tab === TAB.toSpeech"/>
-        <to-text-app v-show="tab === TAB.toText"/>
+        <to-speech-app v-show="tab === TAB.speak"/>
+        <to-text-app v-show="tab === TAB.textualize"/>
       </div>
     </v-container>
   `,
