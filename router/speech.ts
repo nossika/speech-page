@@ -1,5 +1,4 @@
 import { Middleware } from 'koa';
-import { logger } from '@/util/logger';
 import { Code, response } from '@/util/response';
 import Speech from '@/core/speech';
 import { transferAudioFormat } from '@/core/ffmpeg';

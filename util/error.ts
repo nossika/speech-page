@@ -1,6 +1,5 @@
 import { ParameterizedContext } from 'koa';
 import { Code, response } from './response';
-import { logger } from './logger';
 
 export const handleCtxErr = ({
   ctx,

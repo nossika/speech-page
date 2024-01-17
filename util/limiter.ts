@@ -1,6 +1,5 @@
 import { RateLimit } from 'koa2-ratelimit';
 import { Code, response } from '@/util/response';
-import { logger } from '@/util/logger';
 import config from '@/config';
 
 RateLimit.defaultOptions({
