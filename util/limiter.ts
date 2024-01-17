@@ -9,7 +9,7 @@ RateLimit.defaultOptions({
     ctx.body = response('Too many requests, retry later.', Code.ClientError);
   },
   onLimitReached: async function (ctx) {
-    logger(`access limited`, ctx, 'error');
+    ctx.logger(`access limited`, 'error');
   },
 });
 

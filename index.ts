@@ -6,19 +6,29 @@ import koaBody from 'koa-body';
 import etag from 'koa-etag';
 import conditional from 'koa-conditional-get';
 import { Code, response } from '@/util/response';
-import { useAccessLogger } from '@/util/logger';
+import { LoggerType, logger, useAccessLogger } from '@/util/logger';
 import { accessLimiter } from '@/util/limiter';
 import { handleCtxErr } from '@/util/error';
 import router from '@/router';
 import config from '@/config';
 import Speech from '@/core/speech';
 
-const app = new Koa();
-
 // init sdk
 Speech.init({
   key: config.key,
   region: config.region,
+});
+
+const app = new Koa<Koa.DefaultState, {
+  logger: (message: string, type: LoggerType) => void;
+} & Koa.DefaultContext>();
+
+app.use(async (ctx, next) => {
+  ctx.logger = (message: string, type: LoggerType) => {
+    logger(ctx, message, type)
+  };
+
+  await next();
 });
 
 // serve static files
@@ -58,6 +68,7 @@ app.use(async (ctx, next) => {
 
 // logger
 app.use(useAccessLogger());
+
 
 app.use(async (ctx, next) => {
   try {

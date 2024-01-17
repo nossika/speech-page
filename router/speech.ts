@@ -30,7 +30,7 @@ export const textToSpeechRoute: Middleware = async (ctx) => {
     return;
   }
 
-  logger(`text: ${text}`, ctx);
+  ctx.logger(`text: ${text}`);
 
   const buffer = await Speech.get()
     .textToSpeechBuffer(text)
@@ -61,6 +61,8 @@ export const speechToTextRoute: Middleware = async (ctx) => {
     });
     return;
   }
+
+  ctx.logger(`file: ${file.filepath}`);
 
   const buffer = await transferAudioFormat(file.filepath)
     .catch(err => {
