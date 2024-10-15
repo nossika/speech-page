@@ -23,6 +23,7 @@ const config = {
   key: secret.key,
   region: secret.region,
   whiteList: secret.whiteList,
+  loggerBackupDays: 7,
 };
 
 export default config;

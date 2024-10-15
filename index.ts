@@ -5,7 +5,7 @@ import serve from 'koa-static';
 import koaBody from 'koa-body';
 import etag from 'koa-etag';
 import conditional from 'koa-conditional-get';
-import { Code, response } from '@/util/response';
+import { Code } from '@/util/response';
 import { LoggerType, logger, useAccessLogger } from '@/util/logger';
 import { accessLimiter } from '@/util/limiter';
 import { handleCtxErr } from '@/util/error';

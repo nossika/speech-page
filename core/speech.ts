@@ -19,10 +19,10 @@ class AzureSpeech {
   }
 
   async textToSpeechBuffer(text: string, {
-    voiceName = 'zh-CN-XiaoyiNeural',
+    voiceName,
     outputFormat = SpeechSynthesisOutputFormat.Audio16Khz128KBitRateMonoMp3,
   }: {
-    voiceName?: string; // @refer: https://learn.microsoft.com/en-us/azure/cognitive-services/speech-service/language-support?tabs=tts#text-to-speech
+    voiceName?: string; // @refer: https://aka.ms/speech/tts-languages
     outputFormat?: SpeechSynthesisOutputFormat;
   } = {}) {
     const speechConfig = this.getSpeechConfig();

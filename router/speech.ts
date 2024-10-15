@@ -7,6 +7,7 @@ import config from '@/config';
 
 export const textToSpeechRoute: Middleware = async (ctx) => {
   const text = (ctx.request.body as any)?.text;
+  const voice = (ctx.request.body as any)?.voice || 'zh-CN-XiaoyiNeural';
 
   if (!text) {
     handleCtxErr({
@@ -23,7 +24,7 @@ export const textToSpeechRoute: Middleware = async (ctx) => {
       ctx,
       err: new Error(`text length exceeds, limit: ${config.speechTextLengthLimit}, received: ${text.length}`),
       name: 'params check',
-      extraLog: `text: ${text}`,
+      extraLog: `text: ${text}, voice: ${voice}`,
       code: Code.Forbidden,
     });
     return;
@@ -32,7 +33,9 @@ export const textToSpeechRoute: Middleware = async (ctx) => {
   ctx.logger(`text: ${text}`);
 
   const buffer = await Speech.get()
-    .textToSpeechBuffer(text)
+    .textToSpeechBuffer(text, {
+      voiceName: voice,
+    })
     .catch(err => {
       handleCtxErr({
         ctx,

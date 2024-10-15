@@ -1,4 +1,5 @@
-const { ref, computed } = Vue;
+// 显式展示代码依赖（从 CDN 脚本引入的 window 全局变量）
+var { Vue, Vuetify } = window;
 
 const util = {
   request: {
@@ -74,6 +75,9 @@ const util = {
     const types = ['webm', 'mp4', 'ogg', 'x-matroska'].map(s => `audio/${s}`);
     return types.filter(type => MediaRecorder.isTypeSupported(type));
   },
+  getFileSuffix(blob) {
+    return blob.type.split('/').slice(-1)[0] || '';
+  },
   async getRecorderStream() {
     const mediaStream = await window.navigator.mediaDevices.getUserMedia({ audio: true });
     const mimeType = util.getSupportedAudioMIMEType()[0];
@@ -111,222 +115,251 @@ const util = {
   },
 };
 
-const ToSpeechApp = {
+const SpeechApp = {
   setup() {
-    const loading = ref(false);
-    const text = ref('');
-    const submitType = ref('play');
-    const error = ref('');
-    const playing = ref(false);
+    // @refer: https://aka.ms/speech/tts-languages
+    const voiceOptions = [
+      'zh-CN-XiaoyiNeural',
+      'en-US-JennyNeural',
+      'ja-JP-NanamiNeural',
+    ];
 
-    const submit = async () => {
-      if (loading.value || !text.value) return;
-      loading.value = true;
-      error.value = '';
+    const { ref, computed } = Vue;
+    const text = ref('');
+    const file = ref(null);
+    const voice = ref(voiceOptions[0]);
+    const errorText = ref('');
+    const errorAudio = ref('');
+    const submittingText = ref(false);
+    const submittingAudio = ref(false);
+    const playing = ref(false);
+    const recorderStream = ref(null);
+    const isAutoPlay = ref(true);
+    const fileInputElem = ref();
+
+    const toSpeech = async () => {
+      if (submittingText.value || !text.value) return;
+      submittingText.value = true;
+      errorText.value = '';
 
       try {
         const resp = await util.request.post('/text-to-speech', {
           text: text.value,
+          voice: voice.value,
         });
 
-        const audio = await resp.blob();
+        const blob = await resp.blob();
 
-        switch (submitType.value) {
-          case 'play':
-            playing.value = true;
-            util.playAudio(audio).finally(() => {
-              playing.value = false;
-            });
-            break;
-          case 'download':
-            util.download(audio, `${text.value.slice(0, 10)}.mp3`);
-            break;
-        }
+        file.value = new File(
+          [blob],
+          `${text.value.slice(0, 10)}.mp3`,
+          {
+            type: blob.type,
+          }
+        );
       } catch (err) {
         console.error(err);
-        error.value = String(err);
+        errorText.value = String(err);
+      } finally {
+        submittingText.value = false;
       }
 
-      loading.value = false;
+      if (isAutoPlay.value) {
+        playAudio();
+      }
     };
 
-    const setText = (event) => {
-      text.value = event.target.value;
+    const playAudio = () => {
+      if (!file.value) return;
+      playing.value = true;
+      util.playAudio(file.value).finally(() => {
+        playing.value = false;
+      });
     };
-
-    const setSubmitType = (value) => {
-      submitType.value = value;
-    };
-
-    return {
-      text,
-      setText,
-      submit,
-      submitType,
-      setSubmitType,
-      loading,
-      playing,
-      error,
-    };
-  },
-  template: `
-    <v-card class="pa-4">
-      <div>
-        <v-textarea
-          label="Original Text" variant="outlined" :value="text" @input="setText" :loading="loading" hide-details="auto"
-          @keyup.ctrl.enter="submit" placeholder="Use Ctrl + Enter to submit" :prepend-inner-icon="playing ? 'mdi-account-voice' : 'mdi-comment'"
-        />
-        <div class="d-flex align-center mt-4 flex-wrap" style="gap: 16px;">
-          <v-btn
-            @click="submit" :loading="loading" :disabled="!text || playing"
-            color="teal-darken-1" prepend-icon="mdi-account-voice"
-          >
-            speak
-          </v-btn>
-          <v-radio-group inline :model-value="submitType" @update:modelValue="setSubmitType" hide-details>
-            <v-radio label="Play" value="play"></v-radio>
-            <v-radio label="Download" value="download"></v-radio>
-          </v-radio-group>
-        </div>
-        <v-alert class="mt-4" type="error" :text="error" :model-value="!!error"/>
-      </div>
-    </v-card>
-  `,
-};
-
-const ToTextApp = {
-  setup() {
-    const submitting = ref(false);
-    const playing = ref(false);
-    const recorderStream = ref(null);
-    const text = ref('');
-    const error = ref('');
-    const files = ref([]);
-
-    const file = computed(() => {
-      return files?.value?.[0] || null;
-    });
 
     const startRecording = async () => {
       if (recorderStream.value) return;
-      error.value = '';
+      errorAudio.value = '';
       const stream = await util.getRecorderStream().catch(err => {
         error.value = String(err);
       });
       recorderStream.value = stream || null;
+      file.value = null;
     };
 
     const stopRecording = async () => {
       const stream = recorderStream.value;
       if (!stream) return;
       recorderStream.value = null;
-      error.value = '';
+      errorAudio.value = '';
 
       try {
         const blob = await stream();
-        const f = new File(
+
+        file.value = new File(
           [blob],
-          `voice_${new Date().toLocaleString()}`,
+          `voice_${new Date().toLocaleString()}.${util.getFileSuffix(blob) || 'mp3'}`,
           {
             type: blob.type,
           }
         );
-        files.value = [f];
       } catch (err) {
         console.error(err);
-        error.value = String(err);
+        errorAudio.value = String(err);
       }
     };
 
     const isRecording = computed(() => !!recorderStream.value);
 
-    const download = () => {
+    const downloadAudio = () => {
       const f = file.value;
       if (!f) return;
       util.download(f, f.name);
     };
 
-    const submit = async () => {
-      if (submitting.value || !file.value) return;
-      error.value = '';
-      submitting.value = true;
+    const toText = async () => {
+      if (submittingAudio.value || !file.value) return;
+      errorAudio.value = '';
+      submittingAudio.value = true;
       try {
         const resp = await util.request.upload('/speech-to-text', file.value);
-        const d = await resp.json();
-        text.value = d.data.text;
+        const { data } = await resp.json();
+        text.value = data.text;
       } catch (err) {
         console.error(err);
-        error.value = String(err);
+        errorAudio.value = String(err);
+      } finally {
+        submittingAudio.value = false;
       }
-      submitting.value = false;
-    };
-
-    const play = async () => {
-      if (!file.value) return;
-      playing.value = true;
-      util.playAudio(file.value).finally(() => playing.value = false);
     };
 
     return {
-      submit,
-      play,
-      submitting,
-      playing,
-      isRecording,
-      startRecording,
-      stopRecording,
-      error,
       text,
       file,
-      files,
-      download,
+      toSpeech,
+      toText,
+      playAudio,
+      submittingText,
+      submittingAudio,
+      playing,
+      errorText,
+      errorAudio,
+      downloadAudio,
+      startRecording,
+      stopRecording,
+      isRecording,
+      isAutoPlay,
+      fileInputElem,
+      voice,
+      voiceOptions,
     };
   },
   template: `
     <v-card class="pa-4">
-      <div class="d-flex justify-space-between">
-        <div class="w-50 pr-4 pb-4">
-          <div>
-            <v-icon start icon="mdi-microphone"></v-icon>
-            Record Real-time Voice
-          </div>
-          <div class="d-flex mt-4 flex-wrap" style="gap: 16px;">
-            <v-btn @click="startRecording" :loading="isRecording" :disabled="submitting" prepend-icon="mdi-record-circle">
-              record
-            </v-btn>
-            <v-btn @click="stopRecording" :disabled="!isRecording" prepend-icon="mdi-stop">
-              stop
-            </v-btn>
-          </div>
-        </div>
-        <v-divider vertical />
-        <div class="w-50 pl-4 pb-4">
-          <div>
-            <v-icon start icon="mdi-upload"></v-icon>
-            Upload Voice File
-          </div>
-          <div class="mt-4">
-            <v-file-input
-              label="Audio File" v-model="files" :loading="submitting"
-              accept="audio/*" variant="outlined" show-size hide-details="auto"
-              append-icon="mdi-download" @click:append="download" density="compact"
-            />
-          </div>
-        </div>        
+      <v-textarea
+        label="Speech Text"
+        variant="outlined"
+        v-model="text"
+        :loading="submittingText"
+        hide-details="auto"
+        @keyup.ctrl.enter="toSpeech"
+        placeholder="Use Ctrl + Enter to submit"
+      />
+      <v-select
+        class="mt-4"
+        variant="outlined"
+        label="Voice"
+        v-model="voice"
+        :items="voiceOptions"
+      />
+      <div class="d-flex align-center ga-4 mt-4">
+        <v-btn
+          @click="toSpeech"
+          :loading="submittingText"
+          :disabled="!text"
+          color="teal-darken-1"
+          prepend-icon="mdi-account-voice"
+        >
+          speak
+        </v-btn>
+        <v-switch
+          v-model="isAutoPlay"
+          label="Auto Play"
+          color="teal-darken-1"
+          hide-details
+        />
       </div>
-      <v-divider />
-      <div class="d-flex mt-4 flex-wrap" style="gap: 16px;">
-        <v-btn @click="submit" :loading="submitting" :disabled="isRecording || !file"
-          color="teal-darken-1" prepend-icon="mdi-text-recognition">
+      <v-alert class="mt-4" type="error" :text="errorText" :model-value="!!errorText"/>
+    </v-card>
+    <v-card class="pa-4 mt-4">
+      <v-alert class="mb-4" type="error" :text="errorAudio" :model-value="!!errorAudio"/>
+      <div>
+        <v-btn
+          @click="toText"
+          :loading="submittingAudio"
+          :disabled="!file"
+          color="teal-darken-1"
+          prepend-icon="mdi-text-recognition"
+        >
           textualize
         </v-btn>
-        <v-btn @click="play" :loading="playing" :disabled="isRecording || !file"
-          prepend-icon="mdi-play">
-          play
-        </v-btn>
       </div>
-      <v-alert class="mt-4" type="error" :text="error" :model-value="!!error"/>
-      <v-alert class="mt-4" :text="text" :model-value="!!text"/>
+      <div class="mt-4">
+        <v-file-input
+          ref="fileInputElem"
+          label="Speech File"
+          v-model="file"
+          :clearable="false"
+          :loading="submittingAudio || isRecording"
+          accept="audio/*"
+          variant="outlined"
+          show-size
+          hide-details="auto"
+          density="compact"
+        />
+      </div>
+      <div class="d-flex flex-wrap justify-space-between mt-4 ga-4">
+        <div class="d-flex flex-wrap ga-4">
+          <v-btn
+            prepend-icon="mdi-upload"
+            @click="fileInputElem.click()"
+          >
+            upload
+          </v-btn>
+          <v-btn
+            v-if="!isRecording"
+            @click="startRecording"
+            :disabled="submittingAudio"
+            prepend-icon="mdi-record-circle"
+          >
+            record
+          </v-btn>
+          <v-btn
+            v-if="isRecording"
+            @click="stopRecording"
+            prepend-icon="mdi-stop"
+          >
+            stop
+          </v-btn>
+        </div>
+        <div class="d-flex flex-wrap ga-4">
+          <v-btn
+            @click="downloadAudio"
+            :disabled="!file"
+            prepend-icon="mdi-download"
+          >
+            download
+          </v-btn>
+          <v-btn
+            @click="playAudio"
+            :loading="playing"
+            :disabled="!file"
+            prepend-icon="mdi-play"
+          >
+            play
+          </v-btn>
+        </div>
+      </div>
     </v-card>
   `,
 };
@@ -334,45 +367,48 @@ const ToTextApp = {
 const App = {
   setup() {
     const { ref, watchEffect } = Vue;
-    const TAB = {
-      speak: 'speak',
-      textualize: 'textualize',
-    };
+    const tabs = [
+      {
+        key: 'speech',
+        name: 'speech',
+        component: 'SpeechApp',
+      },
+    ].filter(Boolean);
 
-    const tab = ref(util.getURLParams('tab') || TAB.speak);
+    const tab = ref(util.getURLParams('tab') || 'speech');
 
     watchEffect(() => {
       util.setURLParams('tab', tab.value);
     });
 
     return {
-      TAB,
+      tabs,
       tab,
     };
   },
   template: `
     <v-container>
-      <div class="d-flex justify-center mb-4">
+      <div class="mb-5 d-flex justify-center">
         <v-btn-toggle
           v-model="tab"
           color="cyan-lighten-4"
           density="compact"
+          mandatory="force"
         >
-          <v-btn :value="TAB.speak">
-            speak
-          </v-btn>
-          <v-btn :value="TAB.textualize">
-            textualize
+          <v-btn v-for="t in tabs" :value="t.key" :key="t.key">
+            {{ t.name }}
           </v-btn>
         </v-btn-toggle>
       </div>
       <div>
-        <to-speech-app v-show="tab === TAB.speak"/>
-        <to-text-app v-show="tab === TAB.textualize"/>
+        <template v-for="t in tabs">
+          <component :is="t.component" v-if="tab === t.key"/>
+        </template>
       </div>
     </v-container>
   `,
 };
+
 
 const { createApp } = Vue;
 const { createVuetify } = Vuetify;
@@ -380,7 +416,6 @@ const { createVuetify } = Vuetify;
 const vuetify = createVuetify();
 const app = createApp(App);
 
-app.component('ToSpeechApp', ToSpeechApp);
-app.component('ToTextApp', ToTextApp);
+app.component('SpeechApp', SpeechApp);
 
 app.use(vuetify).mount('#app');
