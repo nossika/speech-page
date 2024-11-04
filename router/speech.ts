@@ -52,7 +52,11 @@ export const textToSpeechRoute: Middleware = async (ctx) => {
 };
 
 export const speechToTextRoute: Middleware = async (ctx) => {
-  const file = ctx.request.files?.file as any;
+  let file = ctx.request.files?.file;
+
+  if (file instanceof Array) {
+    file = file[0];
+  }
 
   if (!file) {
     handleCtxErr({

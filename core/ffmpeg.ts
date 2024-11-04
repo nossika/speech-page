@@ -10,16 +10,16 @@ export const transferAudioFormat = async (filePath: string, format = 'wav'): Pro
 
   return new Promise((resolve, reject) => {
     ffmpeg()
-    .input(filePath)
-    .format(format)
-    .save(tempPath)
-    .on('end', () => {
-      const buffer = fs.readFileSync(tempPath);
-      fs.unlinkSync(tempPath);
-      resolve(buffer);
-    })
-    .on('error', (err) => {
-      reject(err);
-    });
+      .input(filePath)
+      .format(format)
+      .save(tempPath)
+      .on('end', () => {
+        const buffer = fs.readFileSync(tempPath);
+        fs.unlinkSync(tempPath);
+        resolve(buffer);
+      })
+      .on('error', (err) => {
+        reject(err);
+      });
   });
 };

@@ -1,5 +1,5 @@
 
-import path from 'path';
+import path from 'node:path';
 import Koa from 'koa';
 import serve from 'koa-static';
 import koaBody from 'koa-body';
