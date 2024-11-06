@@ -1,4 +1,4 @@
-import { AudioConfig, CancellationDetails, CancellationReason, ResultReason, SpeechConfig, SpeechRecognizer, SpeechSynthesisOutputFormat, SpeechSynthesizer } from 'microsoft-cognitiveservices-speech-sdk';
+import { AudioConfig, CancellationDetails, ResultReason, SpeechConfig, SpeechRecognizer, SpeechSynthesisOutputFormat, SpeechSynthesizer } from 'microsoft-cognitiveservices-speech-sdk';
 
 class AzureSpeech {
   private config: { 

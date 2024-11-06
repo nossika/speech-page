@@ -1,12 +1,17 @@
 import fs from 'node:fs';
 import ffmpeg from 'fluent-ffmpeg';
 import { path as ffmpegPath } from '@ffmpeg-installer/ffmpeg';
+import { logger } from '@/util/logger';
 
 ffmpeg.setFfmpegPath(ffmpegPath);
+logger('ffmpeg.setFfmpegPath', ffmpegPath);
+
+let id = 0;
 
 export const transferAudioFormat = async (filePath: string, format = 'wav'): Promise<Buffer> => {
-  // 有小概率冲突风险
-  const tempPath = `${Date.now()}.${format}`;
+  const tempPath = `temp-audio-${id++}.${format}`;
+
+  logger('transferAudioFormat', tempPath);
 
   return new Promise((resolve, reject) => {
     ffmpeg()

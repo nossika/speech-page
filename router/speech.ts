@@ -30,7 +30,7 @@ export const textToSpeechRoute: Middleware = async (ctx) => {
     return;
   }
 
-  ctx.logger(`text: ${text}`);
+  ctx.logger(`text: ${text}, voice: ${voice}`);
 
   const buffer = await Speech.get()
     .textToSpeechBuffer(text, {
@@ -41,7 +41,7 @@ export const textToSpeechRoute: Middleware = async (ctx) => {
         ctx,
         err,
         name: 'to speech buffer failed',
-        extraLog: `text: ${text}`,
+        extraLog: `text: ${text}, voice: ${voice}`,
       });
     });
 
